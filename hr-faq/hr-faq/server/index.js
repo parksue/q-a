@@ -276,6 +276,25 @@ app.post('/api/sync-dooray-project', async (req, res) => {
   }
 });
 
+
+// 프로젝트 디버그
+app.get('/api/project-debug', async (req, res) => {
+  const DOORAY_PROJECT_TASK_ID = process.env.DOORAY_PROJECT_ID;
+  if (!DOORAY_TOKEN || !DOORAY_PROJECT_TASK_ID) return res.json({ error: '환경변수 없음', token: !!DOORAY_TOKEN, projectId: DOORAY_PROJECT_TASK_ID });
+  try {
+    const urls = [
+      `https://api.dooray.com/project/v1/projects/${DOORAY_PROJECT_TASK_ID}/posts?page=0&size=5`,
+      `https://api.dooray.com/project/v1/projects/${DOORAY_PROJECT_TASK_ID}/posts?page=0&size=5&order=-createdAt`,
+    ];
+    const results = {};
+    for (const url of urls) {
+      const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
+      results[url] = await r.json();
+    }
+    res.json({ projectId: DOORAY_PROJECT_TASK_ID, results });
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 // AI 답변 (Groq)
 app.post('/api/chat', async (req, res) => {
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY가 설정되지 않았어요.' });
