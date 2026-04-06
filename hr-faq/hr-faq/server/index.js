@@ -175,7 +175,7 @@ app.post('/api/sync-dooray', async (req, res) => {
           '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
           '두레이ID': { rich_text: [{ text: { content: String(page.id) } }] },
           '링크': { url: wikiLink },
-          '카테고리': { rich_text: [{ text: { content: '기타' } }] },
+          '카테고리': { rich_text: [{ text: { content: '프로그램' } }] },
         };
         if (truncatedComments) props['댓글'] = { rich_text: [{ text: { content: truncatedComments } }] };
         if (hasAttachment) props['첨부파일여부'] = { rich_text: [{ text: { content: 'true' } }] };
@@ -194,6 +194,84 @@ app.post('/api/sync-dooray', async (req, res) => {
     res.json({ ok: true, added, total: wikiPages.length, message: `${added}개 새로 등록됐어요! (전체 ${wikiPages.length}개 중)` });
   } catch (err) {
     console.error('두레이 동기화 오류:', err);
+    res.status(500).json({ error: '동기화 중 오류가 발생했어요: ' + err.message });
+  }
+});
+
+
+// 두레이 프로젝트 게시판 동기화
+app.post('/api/sync-dooray-project', async (req, res) => {
+  const DOORAY_PROJECT_TASK_ID = process.env.DOORAY_PROJECT_ID;
+  if (!DOORAY_TOKEN || !DOORAY_PROJECT_TASK_ID) return res.status(500).json({ error: '두레이 환경변수가 설정되지 않았어요.' });
+  if (!NOTION_TOKEN || !NOTION_DB_ID) return res.status(500).json({ error: '노션 환경변수가 설정되지 않았어요.' });
+
+  try {
+    // 프로젝트 게시글 목록 가져오기
+    const postsRes = await fetch(`https://api.dooray.com/project/v1/projects/${DOORAY_PROJECT_TASK_ID}/posts?page=0&size=100&order=-createdAt`, {
+      headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
+    });
+    const postsData = await postsRes.json();
+    if (!postsRes.ok || !postsData.result) return res.status(500).json({ error: '프로젝트 게시글을 불러오지 못했어요: ' + JSON.stringify(postsData) });
+
+    const posts = postsData.result || [];
+
+    // 노션에 이미 있는 두레이ID 목록
+    const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_size: 100 }),
+    });
+    const notionData = await notionRes.json();
+    const existingIds = new Set(
+      notionData.results.map(p => p.properties['두레이ID']?.rich_text?.[0]?.plain_text).filter(Boolean)
+    );
+
+    const newPosts = posts.filter(p => !existingIds.has(String(p.id)));
+    if (newPosts.length === 0) return res.json({ ok: true, added: 0, message: '새로 추가할 게시글이 없어요.' });
+
+    let added = 0;
+    for (const post of newPosts) {
+      try {
+        const title = post.subject || '제목 없음';
+        const content = post.body?.content || post.subject || '(내용 없음)';
+        const truncatedContent = content.length > 2000 ? content.slice(0, 2000) : content;
+        const postLink = `https://${DOORAY_DOMAIN}.dooray.com/task/${DOORAY_PROJECT_TASK_ID}/${post.id}`;
+
+        // 댓글 가져오기
+        const commentRes = await fetch(`https://api.dooray.com/project/v1/projects/${DOORAY_PROJECT_TASK_ID}/posts/${post.id}/logs?page=0&size=20`, {
+          headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
+        });
+        const commentData = await commentRes.json();
+        const comments = (commentData.result || []).map(c => c.body?.content || '').filter(Boolean).join('
+');
+        const truncatedComments = comments.length > 1000 ? comments.slice(0, 1000) : comments;
+
+        const props = {
+          '제목': { title: [{ text: { content: title } }] },
+          '내용': { rich_text: [{ text: { content: truncatedContent } }] },
+          '파일타입': { rich_text: [{ text: { content: 'dooray' } }] },
+          '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
+          '두레이ID': { rich_text: [{ text: { content: String(post.id) } }] },
+          '링크': { url: postLink },
+          '카테고리': { rich_text: [{ text: { content: '프로그램' } }] },
+        };
+        if (truncatedComments) props['댓글'] = { rich_text: [{ text: { content: truncatedComments } }] };
+        if (comments.length > 0) props['첨부파일여부'] = { rich_text: [{ text: { content: 'true' } }] };
+
+        await fetch('https://api.notion.com/v1/pages', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parent: { database_id: NOTION_DB_ID }, properties: props }),
+        });
+        added++;
+      } catch (e) {
+        console.error('게시글 저장 실패:', post.id, e);
+      }
+    }
+
+    res.json({ ok: true, added, total: posts.length, message: `${added}개 새로 등록됐어요! (전체 ${posts.length}개 중)` });
+  } catch (err) {
+    console.error('프로젝트 동기화 오류:', err);
     res.status(500).json({ error: '동기화 중 오류가 발생했어요: ' + err.message });
   }
 });
