@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HR 도우미</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; height: 100vh; display: flex; flex-direction: column; }
+
+.screen { display: none; }
+.screen.active { display: flex; }
+
+/* 로그인 */
+#loginScreen { min-height: 100vh; align-items: center; justify-content: center; background: #f5f5f3; flex-direction: column; }
+.login-card { width: 380px; background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.login-header { padding: 28px 28px 20px; border-bottom: 1px solid #e5e5e3; }
+.login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.login-logo-icon { width: 32px; height: 32px; background: #185FA5; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.login-logo-icon svg { display: block; }
+.login-logo-text { font-size: 16px; font-weight: 600; }
+.login-desc { font-size: 13px; color: #666; }
+.login-body { padding: 24px 28px 28px; }
+.step { display: none; } .step.active { display: block; }
+.step-label { font-size: 11px; font-weight: 600; color: #999; margin-bottom: 16px; letter-spacing: 0.06em; text-transform: uppercase; }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.role-card { border: 1.5px solid #e5e5e3; border-radius: 10px; padding: 18px 14px; cursor: pointer; text-align: center; transition: all 0.15s; background: #fafaf9; }
+.role-card:hover { border-color: #185FA5; background: #EEF4FB; }
+.role-card.selected { border-color: #185FA5; background: #EEF4FB; }
+.role-card-icon { font-size: 24px; margin-bottom: 8px; }
+.role-card-title { font-size: 14px; font-weight: 600; }
+.role-card-desc { font-size: 11px; color: #888; margin-top: 3px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; font-weight: 500; color: #555; margin-bottom: 6px; }
+.field input { width: 100%; padding: 10px 12px; font-size: 14px; border-radius: 8px; border: 1px solid #ddd; font-family: inherit; outline: none; }
+.field input:focus { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+.code-wrap { position: relative; }
+.code-wrap input { padding-right: 36px; letter-spacing: 0.15em; }
+.code-eye { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 14px; color: #aaa; }
+.primary-btn { width: 100%; padding: 11px; font-size: 14px; font-weight: 600; background: #185FA5; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.12s; }
+.primary-btn:hover { background: #0C447C; }
+.primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.back-link { text-align: center; margin-top: 14px; font-size: 13px; color: #888; cursor: pointer; }
+.back-link:hover { color: #333; }
+.err-msg { font-size: 12px; color: #e24b4a; margin-top: 8px; display: none; }
+.info-box { background: #f0f6ff; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #555; line-height: 1.6; margin-bottom: 16px; border-left: 3px solid #185FA5; }
+
+/* 앱 */
+#appScreen { flex: 1; flex-direction: column; height: 100vh; }
+.app { display: flex; flex: 1; height: 100vh; overflow: hidden; }
+
+.sidebar { width: 220px; min-width: 220px; border-right: 1px solid #e5e5e3; background: #fafaf9; display: flex; flex-direction: column; padding: 18px 0; }
+.sidebar-logo { padding: 0 16px 16px; display: flex; align-items: center; gap: 8px; }
+.sidebar-logo-icon { width: 26px; height: 26px; background: #185FA5; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+.sidebar-logo-text { font-size: 14px; font-weight: 600; }
+.sec { font-size: 11px; font-weight: 600; color: #aaa; padding: 0 16px 8px; letter-spacing: 0.06em; text-transform: uppercase; }
+.sitem { display: flex; align-items: center; gap: 8px; padding: 8px 16px; cursor: pointer; font-size: 13px; color: #666; border-left: 2px solid transparent; transition: all 0.12s; }
+.sitem:hover { background: #fff; color: #1a1a1a; }
+.sitem.active { color: #185FA5; border-left-color: #185FA5; background: #EEF4FB; font-weight: 500; }
+.sidebar-bottom { margin-top: auto; padding: 14px 16px; border-top: 1px solid #e5e5e3; }
+.user-row { display: flex; align-items: center; gap: 8px; }
+.uav { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.logout-btn { margin-left: auto; font-size: 12px; color: #aaa; cursor: pointer; padding: 3px 8px; border-radius: 5px; border: 1px solid #e5e5e3; background: #fff; }
+.logout-btn:hover { color: #e24b4a; border-color: #e24b4a; }
+
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+.topbar { padding: 12px 22px; border-bottom: 1px solid #e5e5e3; display: flex; align-items: center; gap: 10px; background: #fff; }
+.topbar-title { font-size: 15px; font-weight: 600; }
+.rbadge { font-size: 11px; padding: 2px 10px; border-radius: 20px; font-weight: 600; }
+.rbadge.admin { background: #FFF3CD; color: #856404; }
+.rbadge.staff { background: #D4EDDA; color: #155724; }
+
+.content-area { flex: 1; display: flex; overflow: hidden; }
+.chat-panel { flex: 1; display: flex; flex-direction: column; }
+.messages { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+.msg { display: flex; gap: 10px; align-items: flex-start; }
+.msg.user { flex-direction: row-reverse; }
+.av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.av.ai { background: #EEF4FB; color: #185FA5; }
+.av.user { background: #f0f0ee; color: #555; }
+.bubble { max-width: 75%; padding: 11px 15px; border-radius: 14px; font-size: 14px; line-height: 1.65; }
+.bubble.ai { background: #f7f7f5; color: #1a1a1a; }
+.bubble.user { background: #185FA5; color: #fff; }
+.src-tag { display: inline-block; margin-top: 7px; font-size: 11px; padding: 2px 9px; background: #f0f0ee; border-radius: 20px; color: #888; }
+.fchip { display: inline-block; margin: 3px; padding: 5px 12px; font-size: 12px; border-radius: 20px; cursor: pointer; background: #fff; border: 1px solid #e5e5e3; color: #555; transition: all 0.12s; }
+.fchip:hover { background: #EEF4FB; color: #185FA5; border-color: #185FA5; }
+.input-area { padding: 14px 22px; border-top: 1px solid #e5e5e3; background: #fff; }
+.input-row { display: flex; gap: 8px; align-items: flex-end; }
+.input-row textarea { flex: 1; padding: 11px 14px; font-size: 14px; border-radius: 12px; resize: none; min-height: 42px; max-height: 120px; font-family: inherit; border: 1px solid #ddd; outline: none; }
+.input-row textarea:focus { border-color: #185FA5; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+.send-btn { padding: 11px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; background: #185FA5; color: #fff; border: none; flex-shrink: 0; }
+.send-btn:hover { background: #0C447C; }
+.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ptitle { font-size: 11px; font-weight: 600; color: #aaa; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+.upload-zone { border: 1.5px dashed #ccc; border-radius: 10px; padding: 20px 14px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.upload-zone:hover { border-color: #185FA5; background: #EEF4FB; }
+.doc-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #fafaf9; border-radius: 8px; border: 1px solid #e5e5e3; margin-bottom: 8px; }
+.doc-info { flex: 1; min-width: 0; }
+.doc-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+.doc-del { font-size: 13px; color: #ccc; cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+.doc-del:hover { color: #e24b4a; background: #fdf0f0; }
+.tbadge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; margin-left: 5px; }
+.t-xlsx { background: #D4EDDA; color: #155724; }
+.t-txt { background: #e5e5e3; color: #666; }
+
+.typing-indicator { display: flex; gap: 4px; align-items: center; padding: 2px 0; }
+.tdot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; animation: blink 1.2s infinite; }
+.tdot:nth-child(2){animation-delay:.2s} .tdot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2;transform:scale(0.9)}40%{opacity:1;transform:scale(1)}}
+.hidden-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="loginScreen" class="screen active">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-logo">
+        <div class="login-logo-icon">
+          <svg width="16" height="16" fill="none" viewBox="0 0 16 16"><path d="M8 1L1 4.5v7L8 15l7-3.5v-7L8 1z" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="login-logo-text">HR 도우미</div>
+      </div>
+      <div class="login-desc">내부 인사 FAQ 시스템</div>
+    </div>
+    <div class="login-body">
+      <div class="step active" id="step1">
+        <div class="step-label">접속 유형 선택</div>
+        <div class="role-grid">
+          <div class="role-card" id="card-staff" onclick="selectRole('staff')">
+            <div class="role-card-icon">👤</div>
+            <div class="role-card-title">직원</div>
+            <div class="role-card-desc">FAQ 조회만 가능</div>
+          </div>
+          <div class="role-card" id="card-admin" onclick="selectRole('admin')">
+            <div class="role-card-icon">🔑</div>
+            <div class="role-card-title">관리자</div>
+            <div class="role-card-desc">자료 등록 및 관리</div>
+          </div>
+        </div>
+        <button class="primary-btn" id="nextBtn" onclick="goStep2()" disabled>다음으로</button>
+      </div>
+
+      <div class="step" id="step2-staff">
+        <div class="step-label">직원으로 입장</div>
+        <div class="info-box">별도 로그인 없이 바로 이용할 수 있어요.<br>FAQ 조회 및 AI 질문 기능을 사용할 수 있습니다.</div>
+        <button class="primary-btn" onclick="enterAs('staff')">입장하기</button>
+        <div class="back-link" onclick="backToStep1()">← 뒤로 가기</div>
+      </div>
+
+      <div class="step" id="step2-admin">
+        <div class="step-label">관리자 코드 입력</div>
+        <div class="info-box">관리자 코드를 입력해야 자료 등록 기능을 사용할 수 있습니다.</div>
+        <div class="field">
+          <label>관리자 코드</label>
+          <div class="code-wrap">
+            <input type="password" id="adminCode" placeholder="코드 입력" onkeydown="if(event.key==='Enter')enterAdmin()">
+            <span class="code-eye" onclick="toggleEye()">👁</span>
+          </div>
+        </div>
+        <div class="err-msg" id="codeErr">관리자 코드가 올바르지 않아요.</div>
+        <button class="primary-btn" id="adminBtn" onclick="enterAdmin()">확인</button>
+        <div class="back-link" onclick="backToStep1()">← 뒤로 가기</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 앱 -->
+<div id="appScreen" class="screen">
+  <div class="app">
+    <div class="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">
+          <svg width="14" height="14" fill="none" viewBox="0 0 14 14"><path d="M7 1L1 4v6l6 3 6-3V4L7 1z" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="sidebar-logo-text">HR 도우미</div>
+      </div>
+      <div class="sec">메뉴</div>
+      <div class="sitem active" id="menuChat" onclick="setTab('chat',this)">
+        <svg width="13" height="13" fill="none" viewBox="0 0 14 14"><path d="M2 2h10a1 1 0 011 1v6a1 1 0 01-1 1H4l-2 2V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        FAQ 질문
+      </div>
+      <div class="sitem" id="menuDocs" onclick="setTab('docs',this)" style="display:none">
+        <svg width="13" height="13" fill="none" viewBox="0 0 14 14"><path d="M3 1h6l3 3v9H3V1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        자료 관리
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #e5e5e3">
+        <div class="sec">카테고리</div>
+        <div class="sitem" onclick="quickAsk('연차/휴가')">연차/휴가</div>
+        <div class="sitem" onclick="quickAsk('급여/수당')">급여/수당</div>
+        <div class="sitem" onclick="quickAsk('복리후생')">복리후생</div>
+        <div class="sitem" onclick="quickAsk('인사/평가')">인사/평가</div>
+        <div class="sitem" onclick="quickAsk('채용/온보딩')">채용/온보딩</div>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="user-row">
+          <div class="uav" id="sidebarAv"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600" id="sidebarName"></div>
+            <div style="font-size:11px;color:#aaa" id="sidebarRole"></div>
+          </div>
+          <button class="logout-btn" onclick="logout()">나가기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="topbar-title" id="topbarTitle">FAQ 질문</div>
+        <span class="rbadge" id="roleBadge"></span>
+        <span style="margin-left:auto;font-size:12px;color:#aaa" id="docBadge"></span>
+      </div>
+
+      <!-- 채팅 탭 -->
+      <div id="tabChat" class="content-area">
+        <div class="chat-panel">
+          <div class="messages" id="messages">
+            <div class="msg">
+              <div class="av ai">AI</div>
+              <div>
+                <div class="bubble ai">안녕하세요! HR 관련 궁금한 사항을 질문해 주세요.<br>등록된 내부 자료(엑셀 포함)를 기반으로 답변드립니다.</div>
+                <div style="margin-top:8px">
+                  <span class="fchip" onclick="askFaq('연차 신청은 어떻게 하나요?')">연차 신청 방법</span>
+                  <span class="fchip" onclick="askFaq('급여 명세서 확인 방법을 알려주세요')">급여 명세서</span>
+                  <span class="fchip" onclick="askFaq('경조사 휴가 기준을 알려주세요')">경조사 휴가</span>
+                  <span class="fchip" onclick="askFaq('건강검진 지원 방법을 알려주세요')">건강검진</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="input-area">
+            <div class="input-row">
+              <textarea id="userInput" placeholder="질문을 입력하세요..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+              <button class="send-btn" id="sendBtn" onclick="sendMessage()">전송 ↗</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 자료 관리 탭 -->
+      <div id="tabDocs" style="display:none;flex:1;flex-direction:column;overflow-y:auto;padding:22px;gap:16px;background:#fafaf9">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div style="background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:20px">
+            <div class="ptitle">파일 업로드</div>
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()" id="dropZone">
+              <div style="font-size:28px">📂</div>
+              <div style="font-size:13px;color:#666;margin-top:8px">클릭하거나 드래그하여 업로드</div>
+              <div style="font-size:11px;color:#aaa;margin-top:3px">엑셀(.xlsx/.xls/.csv), TXT, DOCX</div>
+            </div>
+            <input type="file" id="fileInput" class="hidden-input" multiple accept=".xlsx,.xls,.csv,.txt,.docx" onchange="handleFiles(event)">
+          </div>
+          <div style="background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:20px">
+            <div class="ptitle">내용 직접 입력</div>
+            <div class="field"><label>자료 제목</label><input type="text" id="manualTitle" placeholder="예: 2025 연차 규정"></div>
+            <textarea id="manualText" placeholder="내용을 붙여넣기 하세요..." style="width:100%;height:90px;font-size:13px;padding:10px;border-radius:8px;resize:none;font-family:inherit;border:1px solid #ddd;outline:none"></textarea>
+            <button onclick="addManual()" style="margin-top:10px;width:100%;padding:10px;font-size:13px;cursor:pointer;border-radius:8px;font-family:inherit;background:#185FA5;color:#fff;border:none;font-weight:600">등록하기</button>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:20px">
+          <div class="ptitle">등록된 자료 (<span id="docCountLbl">0</span>개)</div>
+          <div id="docListFull"><div style="font-size:13px;color:#aaa;text-align:center;padding:24px 0">등록된 자료가 없어요.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let selRole=null, curRole=null, docs=[], history=[];
+
+function selectRole(r){
+  selRole=r;
+  document.getElementById('card-staff').classList.toggle('selected',r==='staff');
+  document.getElementById('card-admin').classList.toggle('selected',r==='admin');
+  document.getElementById('nextBtn').disabled=false;
+}
+function goStep2(){
+  document.getElementById('step1').classList.remove('active');
+  document.getElementById('step2-'+selRole).classList.add('active');
+}
+function backToStep1(){
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step1').classList.add('active');
+  const ac=document.getElementById('adminCode');if(ac)ac.value='';
+  document.getElementById('codeErr').style.display='none';
+}
+function toggleEye(){const i=document.getElementById('adminCode');i.type=i.type==='password'?'text':'password';}
+
+async function enterAdmin(){
+  const code=document.getElementById('adminCode').value.trim();
+  const btn=document.getElementById('adminBtn');
+  btn.disabled=true;btn.textContent='확인 중...';
+  try{
+    const res=await fetch('/api/verify-admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const data=await res.json();
+    if(data.ok){document.getElementById('codeErr').style.display='none';curRole='admin';launchApp();}
+    else{document.getElementById('codeErr').style.display='block';}
+  }catch{document.getElementById('codeErr').textContent='서버에 연결할 수 없어요.';document.getElementById('codeErr').style.display='block';}
+  btn.disabled=false;btn.textContent='확인';
+}
+
+function enterAs(role){curRole=role;launchApp();}
+function launchApp(){
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('appScreen').classList.add('active');
+  const isAdmin=curRole==='admin';
+  document.getElementById('menuDocs').style.display=isAdmin?'flex':'none';
+  document.getElementById('roleBadge').textContent=isAdmin?'관리자':'직원';
+  document.getElementById('roleBadge').className='rbadge '+curRole;
+  const av=document.getElementById('sidebarAv');
+  av.textContent=isAdmin?'AD':'ME';
+  av.style.cssText=`width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;background:${isAdmin?'#FFF3CD':'#EEF4FB'};color:${isAdmin?'#856404':'#185FA5'};`;
+  document.getElementById('sidebarName').textContent=isAdmin?'관리자':'직원';
+  document.getElementById('sidebarRole').textContent=isAdmin?'자료 관리 권한':'조회 전용';
+}
+function logout(){
+  curRole=null;selRole=null;history=[];
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step1').classList.add('active');
+  ['card-staff','card-admin'].forEach(id=>document.getElementById(id).classList.remove('selected'));
+  document.getElementById('nextBtn').disabled=true;
+  document.getElementById('appScreen').classList.remove('active');
+  document.getElementById('loginScreen').classList.add('active');
+  document.getElementById('messages').innerHTML=`<div class="msg"><div class="av ai">AI</div><div><div class="bubble ai">안녕하세요! HR 관련 궁금한 사항을 질문해 주세요.</div><div style="margin-top:8px"><span class="fchip" onclick="askFaq('연차 신청은 어떻게 하나요?')">연차 신청 방법</span><span class="fchip" onclick="askFaq('급여 명세서 확인 방법을 알려주세요')">급여 명세서</span></div></div></div>`;
+  setTab('chat',document.getElementById('menuChat'));
+}
+function setTab(tab,el){
+  document.querySelectorAll('.sitem').forEach(i=>i.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('tabChat').style.display=tab==='chat'?'flex':'none';
+  document.getElementById('tabDocs').style.display=tab==='docs'?'flex':'none';
+  document.getElementById('topbarTitle').textContent=tab==='chat'?'FAQ 질문':'자료 관리';
+}
+function quickAsk(cat){setTab('chat',document.getElementById('menuChat'));document.getElementById('userInput').value=cat+' 관련해서 알려주세요';document.getElementById('userInput').focus();}
+function askFaq(q){document.getElementById('userInput').value=q;sendMessage();}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+
+function appendMsg(role,html,src){
+  const c=document.getElementById('messages'),isUser=role==='user';
+  const d=document.createElement('div');d.className='msg'+(isUser?' user':'');
+  d.innerHTML=`<div class="av ${isUser?'user':'ai'}">${isUser?(curRole==='admin'?'AD':'ME'):'AI'}</div><div><div class="bubble ${isUser?'user':'ai'}">${html}</div>${src?`<div class="src-tag">📎 ${src}</div>`:''}</div>`;
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+function showTyping(){
+  const c=document.getElementById('messages'),d=document.createElement('div');
+  d.className='msg';d.id='typing';
+  d.innerHTML=`<div class="av ai">AI</div><div class="bubble ai"><div class="typing-indicator"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>`;
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+function removeTyping(){const t=document.getElementById('typing');if(t)t.remove();}
+
+async function sendMessage(){
+  const inp=document.getElementById('userInput'),q=inp.value.trim();if(!q)return;
+  inp.value='';inp.style.height='auto';
+  document.getElementById('sendBtn').disabled=true;
+  appendMsg('user',q,null);
+  history.push({role:'user',content:q});
+  showTyping();
+
+  const docCtx=docs.length>0?'\n\n[등록된 내부 자료]\n'+docs.map(d=>`--- ${d.name} (${d.type.toUpperCase()}) ---\n${d.content}`).join('\n\n'):'';
+  const sys=`당신은 회사 내부 HR 업무 전담 AI 도우미입니다. 인사, 급여, 복리후생, 휴가, 채용 관련 질문에 친절하고 정확하게 답변합니다.${docCtx?'\n아래 등록된 내부 자료를 최우선으로 참고하세요.':'\n등록된 자료가 없으면 일반 HR 지식으로 답변하되 회사마다 다를 수 있다고 안내하세요.'}\n답변은 간결하고 실용적으로. 한국어로 답변합니다.${docCtx}`;
+
+  try{
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history.slice(-12),systemPrompt:sys})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    history.push({role:'assistant',content:data.reply});
+    removeTyping();
+    appendMsg('ai',data.reply.replace(/\n/g,'<br>'),docs.length>0?`내부 자료 기반 답변 (${docs.length}개 참조)`:null);
+  }catch(e){
+    removeTyping();
+    appendMsg('ai',`오류: ${e.message}`,null);
+  }
+  document.getElementById('sendBtn').disabled=false;
+}
+
+function parseExcel(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        let txt='';
+        wb.SheetNames.forEach(name=>{
+          const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:''});
+          if(!rows.length)return;
+          txt+=`[시트: ${name}]\n`;
+          rows.forEach(row=>{const line=row.map(c=>String(c??'').trim()).filter(Boolean).join('\t');if(line)txt+=line+'\n';});
+          txt+='\n';
+        });
+        resolve(txt.trim()||'(내용 없음)');
+      }catch(err){reject(err);}
+    };
+    r.onerror=reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+function getType(name){const ext=name.split('.').pop().toLowerCase();return ['xlsx','xls','csv'].includes(ext)?'xlsx':'txt';}
+async function handleFiles(e){
+  for(const file of Array.from(e.target.files)){
+    const type=getType(file.name);
+    if(type==='xlsx'){try{const c=await parseExcel(file);addDoc(file.name,c,'xlsx');}catch{addDoc(file.name,'(파싱 실패)','xlsx');}}
+    else{const r=new FileReader();r.onload=ev=>addDoc(file.name,ev.target.result||'','txt');r.readAsText(file,'UTF-8');}
+  }
+  e.target.value='';
+}
+function addDoc(name,content,type){docs.push({id:Date.now()+Math.random(),name,content,type});updateDocs();}
+function removeDoc(id){docs=docs.filter(d=>d.id!==id);updateDocs();}
+function addManual(){
+  const t=document.getElementById('manualTitle').value.trim()||('자료 '+(docs.length+1));
+  const c=document.getElementById('manualText').value.trim();if(!c)return;
+  addDoc(t,c,'txt');
+  document.getElementById('manualTitle').value='';document.getElementById('manualText').value='';
+}
+function updateDocs(){
+  const n=docs.length;
+  document.getElementById('docCountLbl').textContent=n;
+  document.getElementById('docBadge').textContent=n>0?`자료 ${n}개 등록됨`:'';
+  const fl=document.getElementById('docListFull');if(!fl)return;
+  if(!n){fl.innerHTML='<div style="font-size:13px;color:#aaa;text-align:center;padding:24px 0">등록된 자료가 없어요.</div>';return;}
+  fl.innerHTML=docs.map(d=>`<div class="doc-item"><div style="font-size:20px">${d.type==='xlsx'?'📊':'📝'}</div><div class="doc-info"><div class="doc-name">${d.name}<span class="tbadge t-${d.type}">${d.type.toUpperCase()}</span></div><div class="doc-meta">${d.content.length.toLocaleString()}자 추출</div></div><div class="doc-del" onclick="removeDoc(${d.id})">✕</div></div>`).join('');
+}
+const dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.style.borderColor='#185FA5';});
+dz.addEventListener('dragleave',()=>{dz.style.borderColor='';});
+dz.addEventListener('drop',e=>{e.preventDefault();dz.style.borderColor='';handleFiles({target:{files:e.dataTransfer.files,value:''}});});
+</script>
+</body>
+</html>
