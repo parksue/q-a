@@ -96,23 +96,6 @@ app.delete('/api/docs/:id', async (req, res) => {
 });
 
 
-// 두레이 API 디버그 (임시)
-app.get('/api/dooray-debug', async (req, res) => {
-  if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.json({ error: '환경변수 없음', token: !!DOORAY_TOKEN, wikiId: DOORAY_WIKI_ID });
-  try {
-    const urls = [
-      `https://api.dooray.com/wiki/v1/projects/${DOORAY_WIKI_ID}/pages?page=0&size=5`,
-      `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?page=0&size=5`,
-    ];
-    const results = {};
-    for (const url of urls) {
-      const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
-      results[url] = await r.json();
-    }
-    res.json(results);
-  } catch(e) { res.json({ error: e.message }); }
-});
-
 // 두레이 위키 동기화
 app.post('/api/sync-dooray', async (req, res) => {
   if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.status(500).json({ error: '두레이 환경변수가 설정되지 않았어요.' });
@@ -120,7 +103,7 @@ app.post('/api/sync-dooray', async (req, res) => {
 
   try {
     // 1. 두레이 위키 전체 페이지 목록 가져오기
-    const wikiRes = await fetch(`https://api.dooray.com/wiki/v1/projects/${DOORAY_WIKI_ID}/pages?page=0&size=100`, {
+    const wikiRes = await fetch(`https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?page=0&size=100`, {
       headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
     });
     const wikiData = await wikiRes.json();
@@ -153,7 +136,7 @@ app.post('/api/sync-dooray', async (req, res) => {
     for (const page of newPages) {
       try {
         // 위키 페이지 내용 상세 조회
-        const detailRes = await fetch(`https://api.dooray.com/wiki/v1/projects/${DOORAY_WIKI_ID}/pages/${page.id}`, {
+        const detailRes = await fetch(`https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${page.id}`, {
           headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
         });
         const detail = await detailRes.json();
