@@ -11,6 +11,7 @@ const NOTION_DB_ID = process.env.NOTION_DB_ID;
 const DOORAY_TOKEN = process.env.DOORAY_TOKEN;
 const DOORAY_WIKI_ID = process.env.DOORAY_WIKI_ID;
 const DOORAY_DOMAIN = process.env.DOORAY_DOMAIN || 'joinshr';
+const DOORAY_PROJECT_ID = process.env.DOORAY_PROJECT_ID || '3484734520773902115';
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -41,6 +42,10 @@ app.get('/api/docs', async (req, res) => {
       type: page.properties['파일타입']?.rich_text?.[0]?.plain_text || 'txt',
       date: page.properties['등록일']?.date?.start || '',
       doorayId: page.properties['두레이ID']?.rich_text?.[0]?.plain_text || '',
+      link: page.properties['링크']?.url || '',
+      category: page.properties['카테고리']?.rich_text?.[0]?.plain_text || '기타',
+      comments: page.properties['댓글']?.rich_text?.[0]?.plain_text || '',
+      hasAttachment: page.properties['첨부파일여부']?.rich_text?.[0]?.plain_text === 'true',
     }));
     res.json({ docs });
   } catch (err) {
@@ -52,17 +57,22 @@ app.get('/api/docs', async (req, res) => {
 // 노션에 자료 저장
 app.post('/api/docs', async (req, res) => {
   if (!NOTION_TOKEN || !NOTION_DB_ID) return res.status(500).json({ error: '노션 환경변수가 설정되지 않았어요.' });
-  const { name, content, type, doorayId } = req.body;
+  const { name, content, type, doorayId, link, category, comments, hasAttachment } = req.body;
   if (!name || !content) return res.status(400).json({ error: '제목과 내용이 필요해요.' });
   const truncated = content.length > 2000 ? content.slice(0, 2000) : content;
+  const commentsTruncated = comments && comments.length > 1000 ? comments.slice(0, 1000) : (comments || '');
   try {
     const props = {
       '제목': { title: [{ text: { content: name } }] },
       '내용': { rich_text: [{ text: { content: truncated } }] },
       '파일타입': { rich_text: [{ text: { content: type || 'txt' } }] },
       '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
+      '카테고리': { rich_text: [{ text: { content: category || '기타' } }] },
     };
     if (doorayId) props['두레이ID'] = { rich_text: [{ text: { content: String(doorayId) } }] };
+    if (link) props['링크'] = { url: link };
+    if (commentsTruncated) props['댓글'] = { rich_text: [{ text: { content: commentsTruncated } }] };
+    if (hasAttachment !== undefined) props['첨부파일여부'] = { rich_text: [{ text: { content: String(hasAttachment) } }] };
 
     const response = await fetch('https://api.notion.com/v1/pages', {
       method: 'POST',
@@ -95,30 +105,13 @@ app.delete('/api/docs/:id', async (req, res) => {
   }
 });
 
-
-
-// 두레이 댓글 디버그 (임시)
-app.get('/api/dooray-comment-debug', async (req, res) => {
-  if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.json({ error: '환경변수 없음' });
-  const pageIds = ['3874712926493380307', '3911087659444040580'];
-  try {
-    const results = {};
-    for (const pageId of pageIds) {
-      const url = `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${pageId}/comments?page=0&size=10`;
-      const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
-      results[pageId] = await r.json();
-    }
-    res.json(results);
-  } catch(e) { res.json({ error: e.message }); }
-});
-
-// 두레이 위키 동기화
+// 두레이 위키 동기화 (댓글 + 링크 포함)
 app.post('/api/sync-dooray', async (req, res) => {
   if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.status(500).json({ error: '두레이 환경변수가 설정되지 않았어요.' });
   if (!NOTION_TOKEN || !NOTION_DB_ID) return res.status(500).json({ error: '노션 환경변수가 설정되지 않았어요.' });
 
   try {
-    // 1. 두레이 위키 전체 페이지 목록 가져오기 (트리 구조 - 재귀적으로 모든 하위 페이지 수집)
+    // 모든 위키 페이지 재귀 수집
     async function fetchAllPages(parentId = null) {
       const url = parentId
         ? `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?parentPageId=${parentId}&page=0&size=100`
@@ -135,11 +128,8 @@ app.post('/api/sync-dooray', async (req, res) => {
     }
 
     const wikiPages = await fetchAllPages();
-    if (!wikiPages.length && wikiPages.length === 0) {
-      // 혹시 트리 방식이 안되면 flat 방식 시도
-    }
 
-    // 2. 노션에 이미 등록된 두레이ID 목록 가져오기
+    // 노션에 이미 있는 두레이ID 목록
     const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
@@ -147,44 +137,53 @@ app.post('/api/sync-dooray', async (req, res) => {
     });
     const notionData = await notionRes.json();
     const existingIds = new Set(
-      notionData.results
-        .map(p => p.properties['두레이ID']?.rich_text?.[0]?.plain_text)
-        .filter(Boolean)
+      notionData.results.map(p => p.properties['두레이ID']?.rich_text?.[0]?.plain_text).filter(Boolean)
     );
 
-    // 3. 노션에 없는 것만 필터링
     const newPages = wikiPages.filter(p => !existingIds.has(String(p.id)));
+    if (newPages.length === 0) return res.json({ ok: true, added: 0, message: '새로 추가할 위키 페이지가 없어요.' });
 
-    if (newPages.length === 0) {
-      return res.json({ ok: true, added: 0, message: '새로 추가할 위키 페이지가 없어요.' });
-    }
-
-    // 4. 새 페이지 내용 가져와서 노션에 저장
     let added = 0;
     for (const page of newPages) {
       try {
-        // 위키 페이지 내용 상세 조회
+        // 페이지 상세 내용
         const detailRes = await fetch(`https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${page.id}`, {
           headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
         });
         const detail = await detailRes.json();
         const content = detail.result?.content?.content || detail.result?.subject || '(내용 없음)';
         const title = detail.result?.subject || page.subject || '제목 없음';
-        const truncated = content.length > 2000 ? content.slice(0, 2000) : content;
+
+        // 댓글 가져오기
+        const commentRes = await fetch(`https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${page.id}/comments?page=0&size=20`, {
+          headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
+        });
+        const commentData = await commentRes.json();
+        const comments = (commentData.result || []).map(c => c.body?.content || '').filter(Boolean).join('\n');
+        const hasAttachment = comments.length > 0;
+
+        // 두레이 위키 링크
+        const wikiLink = `https://${DOORAY_DOMAIN}.dooray.com/wiki/${DOORAY_PROJECT_ID}/${page.id}`;
+
+        const truncatedContent = content.length > 2000 ? content.slice(0, 2000) : content;
+        const truncatedComments = comments.length > 1000 ? comments.slice(0, 1000) : comments;
+
+        const props = {
+          '제목': { title: [{ text: { content: title } }] },
+          '내용': { rich_text: [{ text: { content: truncatedContent } }] },
+          '파일타입': { rich_text: [{ text: { content: 'dooray' } }] },
+          '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
+          '두레이ID': { rich_text: [{ text: { content: String(page.id) } }] },
+          '링크': { url: wikiLink },
+          '카테고리': { rich_text: [{ text: { content: '기타' } }] },
+        };
+        if (truncatedComments) props['댓글'] = { rich_text: [{ text: { content: truncatedComments } }] };
+        if (hasAttachment) props['첨부파일여부'] = { rich_text: [{ text: { content: 'true' } }] };
 
         await fetch('https://api.notion.com/v1/pages', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            parent: { database_id: NOTION_DB_ID },
-            properties: {
-              '제목': { title: [{ text: { content: title } }] },
-              '내용': { rich_text: [{ text: { content: truncated } }] },
-              '파일타입': { rich_text: [{ text: { content: 'dooray' } }] },
-              '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
-              '두레이ID': { rich_text: [{ text: { content: String(page.id) } }] },
-            },
-          }),
+          body: JSON.stringify({ parent: { database_id: NOTION_DB_ID }, properties: props }),
         });
         added++;
       } catch (e) {
