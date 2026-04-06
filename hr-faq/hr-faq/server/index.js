@@ -102,14 +102,26 @@ app.post('/api/sync-dooray', async (req, res) => {
   if (!NOTION_TOKEN || !NOTION_DB_ID) return res.status(500).json({ error: '노션 환경변수가 설정되지 않았어요.' });
 
   try {
-    // 1. 두레이 위키 전체 페이지 목록 가져오기
-    const wikiRes = await fetch(`https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?page=0&size=100`, {
-      headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` },
-    });
-    const wikiData = await wikiRes.json();
-    if (!wikiRes.ok) return res.status(500).json({ error: '두레이 위키를 불러오지 못했어요: ' + JSON.stringify(wikiData) });
+    // 1. 두레이 위키 전체 페이지 목록 가져오기 (트리 구조 - 재귀적으로 모든 하위 페이지 수집)
+    async function fetchAllPages(parentId = null) {
+      const url = parentId
+        ? `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?parentPageId=${parentId}&page=0&size=100`
+        : `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?page=0&size=100`;
+      const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
+      const data = await r.json();
+      const pages = data.result || [];
+      let all = [...pages];
+      for (const page of pages) {
+        const children = await fetchAllPages(page.id);
+        all = all.concat(children);
+      }
+      return all;
+    }
 
-    const wikiPages = wikiData.result || [];
+    const wikiPages = await fetchAllPages();
+    if (!wikiPages.length && wikiPages.length === 0) {
+      // 혹시 트리 방식이 안되면 flat 방식 시도
+    }
 
     // 2. 노션에 이미 등록된 두레이ID 목록 가져오기
     const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`, {
