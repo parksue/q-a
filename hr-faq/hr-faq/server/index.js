@@ -100,16 +100,13 @@ app.delete('/api/docs/:id', async (req, res) => {
 // 두레이 댓글 디버그 (임시)
 app.get('/api/dooray-comment-debug', async (req, res) => {
   if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.json({ error: '환경변수 없음' });
-  const pageId = '3874712992943793799'; // 댓글 있는 페이지 ID
+  const pageIds = ['3874712926493380307', '3911087659444040580'];
   try {
-    const urls = [
-      `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${pageId}/comments?page=0&size=10`,
-      `https://api.dooray.com/wiki/v1/projects/${DOORAY_WIKI_ID}/pages/${pageId}/comments?page=0&size=10`,
-    ];
     const results = {};
-    for (const url of urls) {
+    for (const pageId of pageIds) {
+      const url = `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages/${pageId}/comments?page=0&size=10`;
       const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
-      results[url] = await r.json();
+      results[pageId] = await r.json();
     }
     res.json(results);
   } catch(e) { res.json({ error: e.message }); }
