@@ -603,7 +603,7 @@ async function sendMessage(){
   const docCtx=notionDocs.length>0
     ?'\n\n[노션 등록 내부 자료]\n'+notionDocs.map(d=>`--- ${d.name} [카테고리:${d.category}] ---\n${d.content}${d.comments?'\n[댓글]:'+d.comments:''}${d.link?'\n[위키링크]:'+d.link:''}`).join('\n\n')
     :'';
-  const sys=`당신은 회사 내부 HR 업무 전담 AI 도우미입니다. 인사, 급여, 복리후생, 휴가, 채용 관련 질문에 친절하고 정확하게 답변합니다.${docCtx?'\n아래 등록된 내부 자료를 최우선으로 참고하세요. 자료에 위키링크가 있고 첨부파일이 있다면 답변 마지막에 반드시 "자세한 내용 및 첨부파일은 위키 링크를 확인해주세요!"라고 안내하세요.':'\n등록된 자료가 없으면 일반 HR 지식으로 답변하되 회사마다 다를 수 있다고 안내하세요.'}\n답변은 간결하고 실용적으로. 한국어로 답변합니다.${docCtx}`;
+  const sys=`당신은 회사 내부 HR 업무 전담 AI 도우미입니다. 인사, 급여, 복리후생, 휴가, 채용 관련 질문에 친절하고 정확하게 답변합니다.${docCtx?'\n아래 등록된 내부 자료를 최우선으로 참고하세요. 자료에 위키링크가 있고 첨부파일이 있다면 답변 마지막에 반드시 "자세한 내용 및 첨부파일은 위키 링크를 확인해주세요!"라고 안내하세요.':'\n등록된 자료가 없으면 일반 HR 지식으로 답변하되 회사마다 다를 수 있다고 안내하세요.'}\n반드시 한국어로만 답변합니다. 절대 일본어, 중국어, 영어 등 다른 언어를 섞지 마세요. 답변은 간결하고 실용적으로 작성합니다.${docCtx}`;
 
   try{
     const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatHistory.slice(-12),systemPrompt:sys})});
