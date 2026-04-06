@@ -95,6 +95,24 @@ app.delete('/api/docs/:id', async (req, res) => {
   }
 });
 
+
+// 두레이 API 디버그 (임시)
+app.get('/api/dooray-debug', async (req, res) => {
+  if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.json({ error: '환경변수 없음', token: !!DOORAY_TOKEN, wikiId: DOORAY_WIKI_ID });
+  try {
+    const urls = [
+      `https://api.dooray.com/wiki/v1/projects/${DOORAY_WIKI_ID}/pages?page=0&size=5`,
+      `https://api.dooray.com/wiki/v1/wikis/${DOORAY_WIKI_ID}/pages?page=0&size=5`,
+    ];
+    const results = {};
+    for (const url of urls) {
+      const r = await fetch(url, { headers: { 'Authorization': `dooray-api ${DOORAY_TOKEN}` } });
+      results[url] = await r.json();
+    }
+    res.json(results);
+  } catch(e) { res.json({ error: e.message }); }
+});
+
 // 두레이 위키 동기화
 app.post('/api/sync-dooray', async (req, res) => {
   if (!DOORAY_TOKEN || !DOORAY_WIKI_ID) return res.status(500).json({ error: '두레이 환경변수가 설정되지 않았어요.' });
