@@ -270,12 +270,24 @@ app.post('/api/chat', async (req, res) => {
     }).join(' | ');
   }
 
+  // 키워드 매칭으로 유사 자료 찾기 (AI 아님)
+  var similarDoc = null;
+  if (docs && docs.length > 0 && question) {
+    var qWords = question.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 1; });
+    var scored = docs.map(function(d) {
+      var txt = ((d.name || '') + ' ' + (d.content || '') + ' ' + (d.comments || '')).toLowerCase();
+      var score = qWords.reduce(function(acc, w) { return acc + (txt.indexOf(w) !== -1 ? 1 : 0); }, 0);
+      return { doc: d, score: score };
+    }).filter(function(x) { return x.score > 0; })
+      .sort(function(a, b) { return b.score - a.score; });
+    if (scored.length > 0 && scored[0].score >= 1) similarDoc = scored[0].doc;
+  }
+
   var sysBase = docContext
     ? '당신은 회사 내부 HR 도우미입니다.' +
       '규칙1: 반드시 순수한 한국어로만 답변하세요. 한자, 일본어, 중국어, 영어 단어를 절대 사용하지 마세요.' +
-      '규칙2: 아래 참고자료에 있는 내용만 답변하세요. 참고자료에 질문과 정확히 일치하는 내용이 없으면 "등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요."라고만 답변하세요. 절대 링크를 답변에 포함하지 마세요.' +
+      '규칙2: 아래 참고자료에 있는 내용만 답변하세요. 참고자료에 질문과 정확히 일치하는 내용이 없으면 "등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요."라고만 답변하세요. 절대 링크나 URL을 답변에 포함하지 마세요.' +
       '규칙3: 답변은 3문장 이내로 간결하게 작성하세요.' +
-      '규칙4: 참고자료에 질문과 유사한 내용이 있으면 답변 마지막에 "혹시 이런 내용을 찾으시나요? [자료제목]" 형식으로 1개만 안내하세요.' +
       ' 참고자료: ' + docContext
     : '등록된 자료가 없습니다. 모든 질문에 대해 "등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요."라고만 짧게 답변하세요.';
   var systemPrompt = sysBase;
@@ -292,7 +304,12 @@ app.post('/api/chat', async (req, res) => {
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: (data.error && data.error.message) || '오류가 발생했어요.' });
-    res.json({ reply: (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '답변을 가져올 수 없어요.' });
+    var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '답변을 가져올 수 없어요.';
+    // 등록되지 않은 내용일 때 유사 자료 키워드 매칭으로 추천
+    if (reply.indexOf('등록되지 않은') !== -1 && similarDoc) {
+      reply = reply + ' 혹시 이런 내용을 찾으시나요? [' + similarDoc.name + ']';
+    }
+    res.json({ reply: reply, similarDoc: similarDoc ? { name: similarDoc.name, link: similarDoc.link } : null });
   } catch (err) {
     res.status(500).json({ error: '서버 오류가 발생했어요.' });
   }
