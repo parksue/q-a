@@ -155,8 +155,21 @@ app.post('/api/sync-dooray', async (req, res) => {
       try {
         const detailRes = await fetch('https://api.dooray.com/wiki/v1/wikis/' + DOORAY_WIKI_ID + '/pages/' + page.id, { headers: { 'Authorization': 'dooray-api ' + DOORAY_TOKEN } });
         const detail = await detailRes.json();
-        const content = (detail.result && detail.result.content && detail.result.content.content) ? detail.result.content.content : (detail.result ? detail.result.subject : '(내용 없음)');
-        const title = (detail.result ? detail.result.subject : null) || page.subject || '제목 없음';
+        const r = detail.result || {};
+        const title = r.subject || page.subject || '제목 없음';
+        // 두레이 위키 내용 필드 - 여러 경로 시도
+        var rawContent = '';
+        if (r.content && r.content.content) rawContent = r.content.content;
+        else if (r.body && r.body.content) rawContent = r.body.content;
+        else if (r.contents && r.contents.content) rawContent = r.contents.content;
+        else if (r.content && typeof r.content === 'string') rawContent = r.content;
+        // 마크다운 이미지/태그 제거해서 텍스트만 추출
+        var content = rawContent
+          .replace(/!\[.*?\]\(.*?\)/g, '[이미지]')
+          .replace(/<[^>]+>/g, '')
+          .replace(/\*\*/g, '')
+          .replace(/#{1,6}\s/g, '')
+          .trim() || title;
         const comments = await getComments('wiki', DOORAY_WIKI_ID, page.id, DOORAY_TOKEN);
         const wikiLink = 'https://' + DOORAY_DOMAIN + '.dooray.com/wiki/' + '3484734520773902115' + '/' + page.id;
         const props = {
