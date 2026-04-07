@@ -236,15 +236,40 @@ app.post('/api/sync-dooray-project', async (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY가 설정되지 않았어요.' });
-  const { messages, systemPrompt } = req.body;
+  const { messages, docs, question } = req.body;
+
+  // 서버에서 관련 자료 필터링 + 토큰 제한
+  let docContext = '';
+  if (docs && docs.length > 0 && question) {
+    const qWords = question.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 1; });
+    let related = docs.filter(function(d) {
+      const txt = ((d.name || '') + ' ' + (d.content || '') + ' ' + (d.category || '')).toLowerCase();
+      return qWords.some(function(w) { return txt.includes(w); });
+    });
+    if (related.length === 0) related = docs.slice(0, 2);
+    else related = related.slice(0, 3);
+
+    docContext = related.map(function(d) {
+      var line = '[ ' + (d.name || '') + ' / ' + (d.category || '') + ' ]';
+      var body = (d.content || '').slice(0, 150);
+      var link = d.link ? ' 링크:' + d.link : '';
+      return line + ' ' + body + link;
+    }).join(' | ');
+  }
+
+  var sysBase = docContext
+    ? '당신은 회사 내부 HR AI 도우미입니다. 반드시 한국어로만 답변하세요. 다른 언어를 절대 섞지 마세요. 아래 참고자료를 바탕으로만 답변하세요. 참고자료에 없는 내용은 절대 추측하거나 인터넷 정보를 활용하지 말고, 반드시 "등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요."라고만 답변하세요. 참고자료: ' + docContext
+    : '등록된 자료가 없습니다. 모든 질문에 대해 "등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요."라고만 답변하세요.';
+  var systemPrompt = sysBase;
+
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
-        max_tokens: 1000,
-        messages: [{ role: 'system', content: systemPrompt }].concat(messages),
+        max_tokens: 800,
+        messages: [{ role: 'system', content: systemPrompt }].concat(messages.slice(-4)),
       }),
     });
     const data = await response.json();
