@@ -524,8 +524,13 @@ async function sendMessage(){
     if(data.error)throw new Error(data.error);
     chatHistory.push({role:'assistant',content:data.reply});
     removeTyping();
-    var relatedDoc=notionDocs.find(function(d){return d.link&&data.reply.indexOf(d.name)!==-1;});
-    var wikiLink=relatedDoc?relatedDoc.link:null;
+    var wikiLink=null;
+    if(data.similarDoc && data.similarDoc.link) {
+      wikiLink=data.similarDoc.link;
+    } else {
+      var relatedDoc=notionDocs.find(function(d){return d.link&&data.reply.indexOf(d.name)!==-1;});
+      wikiLink=relatedDoc?relatedDoc.link:null;
+    }
     appendMsg('ai',data.reply.replace(/\n/g,'<br>'),notionDocs.length>0?'내부 자료 기반 답변':null,wikiLink);
     if(data.reply.indexOf('등록되지 않은')===-1)showSuggestedQuestions(q,data.reply);
   }catch(e){removeTyping();appendMsg('ai','오류: '+e.message,null,null);}
