@@ -618,12 +618,6 @@ async function importDoorayUrl(){
   btn.disabled=false;btn.textContent='가져오기';
 }
 
-  catch(e){showToast('동기화 실패: '+e.message);}
-  btn.disabled=false;btn.textContent='🔗 위키 동기화';
-}
-  catch(e){showToast('동기화 실패: '+e.message);}
-  btn.disabled=false;btn.textContent='📋 프로젝트 동기화';
-}
 
 function showSuggestedQuestions(question,reply){
   var c=document.getElementById('messages');
