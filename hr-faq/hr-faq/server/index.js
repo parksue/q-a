@@ -306,6 +306,17 @@ app.post('/api/chat', async (req, res) => {
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: (data.error && data.error.message) || '오류가 발생했어요.' });
     var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '답변을 가져올 수 없어요.';
+
+    // 한자/일본어 감지 후 해당 문장 제거
+    var hasCJK = /[㐀-鿿一-鿿぀-ヿ]/.test(reply);
+    if (hasCJK) {
+      // 한자/일본어 포함된 문장만 제거
+      reply = reply.split(/[.。!?]\s*/).filter(function(s) {
+        return !/[㐀-鿿一-鿿぀-ヿ]/.test(s);
+      }).join('. ').trim();
+      if (!reply) reply = '내용을 확인해주세요.';
+    }
+
     // 등록되지 않은 내용이면 서버에서 강제로 고정 문구로 교체
     var notRegistered = reply.indexOf('등록되지 않은') !== -1 || reply.indexOf('클라우드관리팀') !== -1;
     if (notRegistered) {
