@@ -88,13 +88,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .board-header { display: flex; align-items: center; margin-bottom: 16px; gap: 10px; }
 .board-title { font-size: 16px; font-weight: 600; flex: 1; }
 .board-empty { text-align: center; padding: 60px 0; color: #aaa; font-size: 14px; }
-.board-item { background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; padding: 18px 20px; margin-bottom: 10px; transition: all 0.12s; }
-.board-item:hover { border-color: #185FA5; box-shadow: 0 2px 8px rgba(24,95,165,0.08); }
-.board-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+
+.board-item { background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; margin-bottom: 10px; transition: all 0.12s; overflow: hidden; }
+.board-item-header { display: flex; align-items: center; gap: 8px; padding: 16px 20px; cursor: pointer; flex-wrap: wrap; }
+.board-item-header:hover { background: #fafaf9; }
 .board-item-title { font-size: 14px; font-weight: 600; flex: 1; }
 .board-item-date { font-size: 11px; color: #aaa; }
-.board-item-content { font-size: 13px; color: #555; line-height: 1.6; }
-.board-item-footer { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.board-item-arrow { font-size: 12px; color: #aaa; transition: transform 0.2s; }
+.board-item.open .board-item-arrow { transform: rotate(180deg); }
+.board-item-body { display: none; padding: 0 20px 18px; border-top: 1px solid #f0f0ee; }
+.board-item.open .board-item-body { display: block; }
+.board-item-content { font-size: 13px; color: #555; line-height: 1.7; white-space: pre-wrap; padding-top: 14px; }
+.board-item-footer { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
 .board-item-link { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 3px 10px; background: #EEF4FB; border: 1px solid #c5d8f0; border-radius: 20px; color: #185FA5; text-decoration: none; font-weight: 500; }
 .type-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
 .type-dooray { background: #D4EDDA; color: #155724; }
@@ -286,9 +292,51 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <div class="ptitle" style="margin-bottom:0">노션 등록 자료 (<span id="docCountLbl">0</span>개)</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button onclick="loadDocs()" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid #e5e5e3;background:#fff;cursor:pointer;color:#555">🔄 새로고침</button>
-              <button onclick="syncDooray()" id="syncBtn" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid #185FA5;background:#EEF4FB;cursor:pointer;color:#185FA5;font-weight:600">🔗 위키 동기화</button>
-              <button onclick="syncProject()" id="syncProjectBtn" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid #856404;background:#FFF3CD;cursor:pointer;color:#856404;font-weight:600">📋 프로젝트 동기화</button>
+
             </div>
+          </div>
+          <!-- 두레이 링크 직접 입력 -->
+          <!-- PDF/이미지 AI 추출 등록 -->
+          <div style="background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:20px;margin-bottom:14px;">
+            <div class="ptitle">📄 PDF / 이미지 AI 분석 등록</div>
+            <p style="font-size:12px;color:#888;margin-bottom:12px;">PDF나 이미지를 올리면 AI가 내용을 읽고 제목/내용을 자동으로 정리해서 등록해요.</p>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div class="field" style="margin-bottom:8px"><label>카테고리</label><select id="extractCategory"><option value="급여">💰 급여</option><option value="도입">🚀 도입</option><option value="업무요청">📋 업무요청</option><option value="프로그램">💻 프로그램</option><option value="보안">🔒 보안</option><option value="사대보험">🏥 사대보험</option><option value="기타">기타</option></select></div>
+                <div class="upload-zone" onclick="document.getElementById('extractFileInput').click()" id="extractDropZone" style="padding:14px">
+                  <div style="font-size:22px">📎</div>
+                  <div style="font-size:13px;color:#666;margin-top:6px">PDF 또는 이미지 클릭/드래그</div>
+                  <div style="font-size:11px;color:#aaa;margin-top:3px">.pdf, .jpg, .jpeg, .png 지원</div>
+                </div>
+                <input type="file" id="extractFileInput" class="hidden-input" accept=".pdf,.jpg,.jpeg,.png" onchange="handleExtractFile(event)">
+              </div>
+              <div id="extractPreview" style="display:none;flex:1;min-width:200px;padding:12px;background:#f7f7f5;border-radius:10px;border:1px solid #e5e5e3">
+                <div style="font-size:12px;font-weight:600;color:#555;margin-bottom:6px" id="extractFileName"></div>
+                <div style="font-size:12px;color:#aaa" id="extractStatus">AI 분석 중...</div>
+                <div id="extractResult" style="display:none;margin-top:8px">
+                  <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:4px" id="extractTitle"></div>
+                  <div style="font-size:12px;color:#555;line-height:1.6" id="extractContent"></div>
+                  <button onclick="confirmExtract()" style="margin-top:10px;width:100%;padding:8px;font-size:13px;font-weight:600;background:#185FA5;color:#fff;border:none;border-radius:8px;cursor:pointer">노션에 등록하기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;padding:12px 14px;background:#fafaf9;border-radius:10px;border:1px solid #e5e5e3;">
+            <span style="font-size:13px;color:#555;white-space:nowrap">🔗 두레이 링크 등록</span>
+            <input type="text" id="doorayUrlInput" placeholder="https://joinshr.dooray.com/wiki/... 또는 /task/..." style="flex:1;padding:8px 12px;font-size:13px;border-radius:8px;border:1px solid #ddd;outline:none;font-family:inherit;">
+            <select id="doorayUrlCategory" style="padding:8px 10px;font-size:13px;border-radius:8px;border:1px solid #ddd;outline:none;font-family:inherit;">
+              <option value="급여">💰 급여</option>
+              <option value="도입">🚀 도입</option>
+              <option value="업무요청">📋 업무요청</option>
+              <option value="프로그램">💻 프로그램</option>
+              <option value="보안">🔒 보안</option>
+              <option value="사대보험">🏥 사대보험</option>
+              <option value="기타">기타</option>
+            </select>
+            <button onclick="importDoorayUrl()" id="importUrlBtn" style="padding:8px 14px;font-size:13px;font-weight:600;border-radius:8px;background:#185FA5;color:#fff;border:none;cursor:pointer;white-space:nowrap;">가져오기</button>
+          </div>
+          <div style="display:none" id="docListWrap">
           </div>
           <div id="docListFull"><div style="font-size:13px;color:#aaa;text-align:center;padding:24px 0">불러오는 중...</div></div>
         </div>
@@ -373,6 +421,11 @@ function hl(text,kw){
   return e.replace(new RegExp('('+k+')','gi'),'<span class="highlight">$1</span>');
 }
 
+function toggleItem(el){
+  var item=el.closest('.board-item');
+  item.classList.toggle('open');
+}
+
 function renderBoardItems(docs,kw){
   var list=document.getElementById('boardList');
   var cnt=document.getElementById('searchCount');
@@ -380,11 +433,23 @@ function renderBoardItems(docs,kw){
   if(!docs.length){list.innerHTML='<div class="board-empty">📭 '+(kw?'"'+escHtml(kw)+'" 검색 결과가 없어요.':'등록된 자료가 없어요.')+'</div>';return;}
   list.innerHTML=docs.map(function(d){
     var name=hl(d.name,kw);
-    var body=d.content?hl(d.content.slice(0,300)+(d.content.length>300?'...':''),kw):'내용 없음';
-    var comment=d.comments?'<div class="comment-box">💬 '+hl(d.comments.slice(0,150),kw)+'</div>':'';
+    var body=d.content?hl(d.content,kw):'내용 없음';
+    var comment=d.comments?'<div class="comment-box" style="margin-top:12px">💬 '+hl(d.comments.slice(0,300),kw)+'</div>':'';
     var link=d.link?'<a href="'+escHtml(d.link)+'" target="_blank" class="board-item-link">🔗 두레이에서 자세히 보기</a>':'';
     var attach=d.hasAttachment?'<span style="font-size:11px;color:#856404;background:#FFF3CD;padding:2px 8px;border-radius:10px;">📎 첨부파일 있음</span>':'';
-    return '<div class="board-item"><div class="board-item-header"><span class="board-item-title">'+name+'</span><span class="type-badge type-'+d.type+'">'+d.type.toUpperCase()+'</span><span class="board-item-date">'+(d.date||'')+'</span></div><div class="board-item-content">'+body+'</div>'+comment+'<div class="board-item-footer">'+link+attach+'</div></div>';
+    return '<div class="board-item">' +
+      '<div class="board-item-header" onclick="toggleItem(this)">' +
+        '<span class="board-item-title">'+name+'</span>' +
+        '<span class="type-badge type-'+d.type+'">'+d.type.toUpperCase()+'</span>' +
+        '<span class="board-item-date">'+(d.date||'')+'</span>' +
+        '<span class="board-item-arrow">▼</span>' +
+      '</div>' +
+      '<div class="board-item-body">' +
+        '<div class="board-item-content">'+body+'</div>' +
+        comment +
+        '<div class="board-item-footer">'+link+attach+'</div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 
@@ -473,28 +538,118 @@ async function addManual(){
   catch(err){showToast('저장 실패: '+err.message);}
 }
 
-async function syncDooray(){
-  var btn=document.getElementById('syncBtn');btn.disabled=true;btn.textContent='동기화 중...';
-  try{var res=await fetch('/api/sync-dooray',{method:'POST'});var data=await res.json();if(data.error)showToast('오류: '+data.error);else{showToast(data.message);await loadDocs();}}
+var extractedData = null;
+
+async function handleExtractFile(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var preview = document.getElementById('extractPreview');
+  var status = document.getElementById('extractStatus');
+  var result = document.getElementById('extractResult');
+  document.getElementById('extractFileName').textContent = file.name;
+  preview.style.display = 'block';
+  result.style.display = 'none';
+  status.textContent = 'AI가 내용을 분석하는 중...';
+
+  try {
+    var base64 = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function(ev) { resolve(ev.target.result.split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    var res = await fetch('/api/extract-and-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileData: base64,
+        fileName: file.name,
+        fileType: file.type,
+        category: document.getElementById('extractCategory').value,
+        dryRun: true
+      })
+    });
+    var data = await res.json();
+    if (data.error) { status.textContent = '오류: ' + data.error; return; }
+
+    extractedData = { title: data.title, content: data.fullContent, category: document.getElementById('extractCategory').value };
+    document.getElementById('extractTitle').textContent = data.title;
+    document.getElementById('extractContent').textContent = (data.fullContent || '').slice(0, 200) + '...';
+    status.style.display = 'none';
+    result.style.display = 'block';
+  } catch(err) {
+    status.textContent = '오류: ' + err.message;
+  }
+  e.target.value = '';
+}
+
+async function confirmExtract() {
+  if (!extractedData) return;
+  try {
+    var res = await fetch('/api/docs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: extractedData.title, content: extractedData.content, type: 'txt', category: extractedData.category, link: '', comments: '', hasAttachment: false })
+    });
+    var data = await res.json();
+    if (data.error) { showToast('오류: ' + data.error); return; }
+    showToast('"' + extractedData.title + '" 등록됐어요!');
+    document.getElementById('extractPreview').style.display = 'none';
+    document.getElementById('extractResult').style.display = 'none';
+    document.getElementById('extractStatus').style.display = 'block';
+    extractedData = null;
+    await loadDocs();
+  } catch(err) { showToast('오류: ' + err.message); }
+}
+
+async function importDoorayUrl(){
+  var url=document.getElementById('doorayUrlInput').value.trim();
+  var cat=document.getElementById('doorayUrlCategory').value;
+  if(!url){showToast('두레이 링크를 입력해주세요!');return;}
+  var btn=document.getElementById('importUrlBtn');btn.disabled=true;btn.textContent='가져오는 중...';
+  try{
+    var res=await fetch('/api/import-dooray-url',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:url,category:cat})});
+    var data=await res.json();
+    if(data.error)showToast('오류: '+data.error);
+    else if(data.ok){showToast(data.message);document.getElementById('doorayUrlInput').value='';await loadDocs();}
+    else showToast(data.message);
+  }catch(e){showToast('오류: '+e.message);}
+  btn.disabled=false;btn.textContent='가져오기';
+}
+
   catch(e){showToast('동기화 실패: '+e.message);}
   btn.disabled=false;btn.textContent='🔗 위키 동기화';
 }
-async function syncProject(){
-  var btn=document.getElementById('syncProjectBtn');btn.disabled=true;btn.textContent='동기화 중...';
-  try{var res=await fetch('/api/sync-dooray-project',{method:'POST'});var data=await res.json();if(data.error)showToast('오류: '+data.error);else{showToast(data.message);await loadDocs();}}
   catch(e){showToast('동기화 실패: '+e.message);}
   btn.disabled=false;btn.textContent='📋 프로젝트 동기화';
 }
 
 function showSuggestedQuestions(question,reply){
   var c=document.getElementById('messages');
-  var suggestions={'급여':['급여 지급일은 언제인가요?','수당 종류가 어떻게 되나요?','급여명세서 확인 방법을 알려주세요'],'사대보험':['4대보험 가입 기준이 어떻게 되나요?','건강보험료 계산 방법을 알려주세요','고용보험 실업급여 조건이 어떻게 되나요?'],'도입':['도입 신청 절차가 어떻게 되나요?','도입 후 설정 방법을 알려주세요','담당자 연락처가 어떻게 되나요?'],'프로그램':['프로그램 설치 방법을 알려주세요','오류 발생 시 어떻게 해야 하나요?','업데이트 방법을 알려주세요'],'보안':['비밀번호 변경 방법을 알려주세요','보안 정책이 어떻게 되나요?','접근 권한 신청 방법을 알려주세요'],'업무요청':['업무 요청 절차가 어떻게 되나요?','담당 부서가 어디인가요?','처리 기간이 얼마나 걸리나요?']};
-  var cat=notionDocs.find(function(d){return reply.indexOf(d.name)!==-1||reply.indexOf(d.category)!==-1;});
-  var catName=cat?cat.category:'';
-  var chips=(suggestions[catName]||['연차 신청 방법을 알려주세요','급여 관련해서 알려주세요','사대보험 관련해서 알려주세요']).filter(function(s){return s.toLowerCase().indexOf(question.toLowerCase().slice(0,5))===-1;});
+  // 답변에 언급된 자료 이름 기반으로 관련 자료 찾기
+  var qLow=question.toLowerCase();
+  var qWords=qLow.split(/\s+/).filter(function(w){return w.length>1;});
+  // 키워드 매칭으로 관련 자료 찾기
+  var scored=notionDocs.map(function(d){
+    var txt=((d.name||'')+' '+(d.content||'')+' '+(d.comments||'')).toLowerCase();
+    var score=qWords.reduce(function(acc,w){return acc+(txt.indexOf(w)!==-1?1:0);},0);
+    return {doc:d,score:score};
+  }).filter(function(x){return x.score>0&&x.doc.name.toLowerCase().indexOf(qLow.slice(0,4))===-1;})
+    .sort(function(a,b){return b.score-a.score;})
+    .slice(0,3);
+  if(!scored.length)return; // 관련 자료 없으면 추천 안 보여줌
   var div=document.createElement('div');div.style.cssText='padding:4px 0 8px 40px;display:flex;flex-wrap:wrap;gap:6px;';
-  var lbl=document.createElement('span');lbl.style.cssText='font-size:11px;color:#aaa;width:100%;margin-bottom:2px;';lbl.textContent='💡 관련 질문';div.appendChild(lbl);
-  chips.slice(0,3).forEach(function(s){var btn=document.createElement('span');btn.textContent=s;btn.style.cssText='display:inline-block;padding:5px 12px;font-size:12px;border-radius:20px;cursor:pointer;background:#fff;border:1px solid #e5e5e3;color:#555;';btn.onclick=function(){askFaq(s);};div.appendChild(btn);});
+  var lbl=document.createElement('span');lbl.style.cssText='font-size:11px;color:#aaa;width:100%;margin-bottom:2px;';lbl.textContent='💡 관련 자료';div.appendChild(lbl);
+  scored.forEach(function(x){
+    var d=x.doc;
+    var btn=document.createElement('span');
+    btn.textContent=d.name.length>20?d.name.slice(0,20)+'...':d.name;
+    btn.title=d.name;
+    btn.style.cssText='display:inline-block;padding:5px 12px;font-size:12px;border-radius:20px;cursor:pointer;background:#fff;border:1px solid #e5e5e3;color:#555;';
+    btn.onclick=function(){askFaq(d.name+' 에 대해 알려주세요');};
+    div.appendChild(btn);
+  });
   c.appendChild(div);c.scrollTop=c.scrollHeight;
 }
 
