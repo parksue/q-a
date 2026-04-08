@@ -306,9 +306,11 @@ app.post('/api/chat', async (req, res) => {
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: (data.error && data.error.message) || '오류가 발생했어요.' });
     var reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '답변을 가져올 수 없어요.';
-    // 등록되지 않은 내용일 때 유사 자료 키워드 매칭으로 추천
-    if (reply.indexOf('등록되지 않은') !== -1 && similarDoc) {
-      reply = reply + ' 혹시 이런 내용을 찾으시나요? [' + similarDoc.name + ']';
+    // 등록되지 않은 내용이면 서버에서 강제로 고정 문구로 교체
+    var notRegistered = reply.indexOf('등록되지 않은') !== -1 || reply.indexOf('클라우드관리팀') !== -1;
+    if (notRegistered) {
+      reply = '등록되지 않은 내용입니다. 추가가 필요한 경우 클라우드관리팀에 문의하세요.';
+      if (similarDoc) reply += ' 혹시 이런 내용을 찾으시나요? [' + similarDoc.name + ']';
     }
     res.json({ reply: reply, similarDoc: similarDoc ? { name: similarDoc.name, link: similarDoc.link } : null });
   } catch (err) {
