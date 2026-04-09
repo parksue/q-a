@@ -568,3 +568,64 @@ app.post('/api/extract-and-save', async (req, res) => {
     res.status(500).json({ error: '추출 실패: ' + err.message });
   }
 });
+
+// 노션 페이지 내용 가져오기
+app.post('/api/import-notion-page', async (req, res) => {
+  if (!NOTION_TOKEN || !NOTION_DB_ID) return res.status(500).json({ error: '노션 환경변수가 설정되지 않았어요.' });
+  var pageId = (req.body.pageId || '').replace(/-/g, '');
+  var category = req.body.category || '기타';
+  if (!pageId) return res.status(400).json({ error: '페이지 ID가 없어요.' });
+
+  try {
+    // 페이지 기본 정보
+    var pageRes = await fetch('https://api.notion.com/v1/pages/' + pageId, {
+      headers: { 'Authorization': 'Bearer ' + NOTION_TOKEN, 'Notion-Version': '2022-06-28' }
+    });
+    var pageData = await pageRes.json();
+    if (!pageRes.ok) return res.status(400).json({ error: '페이지를 불러오지 못했어요: ' + (pageData.message || '') });
+
+    // 제목 추출
+    var title = '제목 없음';
+    var props = pageData.properties || {};
+    for (var key in props) {
+      var p = props[key];
+      if (p.type === 'title' && p.title && p.title[0]) { title = p.title[0].plain_text; break; }
+    }
+
+    // 페이지 블록 내용 가져오기
+    var blocksRes = await fetch('https://api.notion.com/v1/blocks/' + pageId + '/children?page_size=50', {
+      headers: { 'Authorization': 'Bearer ' + NOTION_TOKEN, 'Notion-Version': '2022-06-28' }
+    });
+    var blocksData = await blocksRes.json();
+    var blocks = blocksData.results || [];
+
+    var textLines = [];
+    blocks.forEach(function(block) {
+      var type = block.type;
+      var b = block[type];
+      if (!b) return;
+      var texts = b.rich_text || [];
+      var line = texts.map(function(t) { return t.plain_text || ''; }).join('');
+      if (line.trim()) textLines.push(line.trim());
+    });
+
+    var bodyContent = textLines.join('\n') || title;
+    var truncated = bodyContent.length > 2000 ? bodyContent.slice(0, 2000) : bodyContent;
+    var notionLink = 'https://notion.so/' + pageId;
+
+    var notionProps = {
+      '제목': { title: [{ text: { content: title } }] },
+      '내용': { rich_text: [{ text: { content: truncated } }] },
+      '파일타입': { rich_text: [{ text: { content: 'txt' } }] },
+      '등록일': { date: { start: new Date().toISOString().slice(0, 10) } },
+      '카테고리': { rich_text: [{ text: { content: category } }] },
+      '링크': { url: notionLink },
+    };
+
+    await saveToNotion(notionProps, NOTION_TOKEN, NOTION_DB_ID);
+    res.json({ ok: true, message: '"' + title + '" 노션에서 가져왔어요!' });
+  } catch (err) {
+    console.error('노션 페이지 가져오기 오류:', err);
+    res.status(500).json({ error: '가져오기 실패: ' + err.message });
+  }
+});
