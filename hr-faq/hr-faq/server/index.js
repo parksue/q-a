@@ -30,7 +30,7 @@ app.get('/api/docs', async (req, res) => {
     const response = await fetch('https://api.notion.com/v1/databases/' + NOTION_DB_ID + '/query', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + NOTION_TOKEN, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page_size: 100 }),
+      body: JSON.stringify({ page_size: 100, sorts: [{ property: '등록일', direction: 'descending' }] }),
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.message });
@@ -100,6 +100,21 @@ app.delete('/api/docs/:id', async (req, res) => {
     res.status(500).json({ error: '노션에서 삭제하지 못했어요.' });
   }
 });
+
+
+
+function cleanContent(raw) {
+  if (!raw) return '';
+  var r = raw;
+  r = r.replace(/<br>/gi, ' ');
+  r = r.replace(/<[^>]+>/g, '');
+  r = r.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ');
+  r = r.replace(/#{1,6} /g, '');
+  r = r.replace(/[*]{2}/g, '');
+  r = r.replace(/ {2,}/g, ' ');
+  return r.replace(/\n\n\n+/g, '\n\n').trim();
+}
+
 
 async function getComments(type, projectId, pageId, token) {
   try {
