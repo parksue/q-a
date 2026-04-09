@@ -612,7 +612,7 @@ async function importNotionUrl(){
   if(!url){showToast('노션 링크를 입력해주세요!');return;}
   var cat = document.getElementById('uploadCategory').value;
   // 노션 페이지 ID 추출
-  var match = url.match(/([a-f0-9]{32})/i) || url.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+  var match = url.match(/([a-f0-9]{32})/) || url.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
   if(!match){showToast('올바른 노션 링크가 아니에요!');return;}
   var pageId = match[1].replace(/-/g,'');
   try{
