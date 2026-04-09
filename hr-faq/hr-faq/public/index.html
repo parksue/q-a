@@ -278,6 +278,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
               <div style="font-size:11px;color:#aaa;margin-top:3px">엑셀(.xlsx/.xls/.csv), TXT</div>
             </div>
             <input type="file" id="fileInput" class="hidden-input" multiple accept=".xlsx,.xls,.csv,.txt,.docx" onchange="handleFiles(event)">
+            <div style="display:flex;gap:6px;margin-top:10px;align-items:center">
+              <input type="text" id="notionUrlInput" placeholder="노션 페이지 링크 붙여넣기..." style="flex:1;padding:8px 12px;font-size:13px;border-radius:8px;border:1px solid #ddd;outline:none;font-family:inherit;">
+              <button onclick="importNotionUrl()" style="padding:8px 12px;font-size:13px;font-weight:600;border-radius:8px;background:#1a1a1a;color:#fff;border:none;cursor:pointer;white-space:nowrap;">노션 가져오기</button>
+            </div>
           </div>
           <div style="background:#fff;border:1px solid #e5e5e3;border-radius:12px;padding:20px">
             <div class="ptitle">내용 직접 입력</div>
@@ -603,6 +607,22 @@ async function confirmExtract() {
   } catch(err) { showToast('오류: ' + err.message); }
 }
 
+async function importNotionUrl(){
+  var url = document.getElementById('notionUrlInput').value.trim();
+  if(!url){showToast('노션 링크를 입력해주세요!');return;}
+  var cat = document.getElementById('uploadCategory').value;
+  // 노션 페이지 ID 추출
+  var match = url.match(/([a-f0-9]{32})/i) || url.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+  if(!match){showToast('올바른 노션 링크가 아니에요!');return;}
+  var pageId = match[1].replace(/-/g,'');
+  try{
+    var res = await fetch('/api/import-notion-page',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pageId:pageId,category:cat})});
+    var data = await res.json();
+    if(data.error)showToast('오류: '+data.error);
+    else{showToast(data.message);document.getElementById('notionUrlInput').value='';await loadDocs();}
+  }catch(e){showToast('오류: '+e.message);}
+}
+
 async function importDoorayUrl(){
   var url=document.getElementById('doorayUrlInput').value.trim();
   var cat=document.getElementById('doorayUrlCategory').value;
@@ -654,7 +674,7 @@ function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMe
 function appendMsg(role,html,src,link){
   var c=document.getElementById('messages'),isUser=role==='user';
   var d=document.createElement('div');d.className='msg'+(isUser?' user':'');
-  d.innerHTML='<div class="av '+(isUser?'user':'ai')+'">'+(isUser?(curRole==='admin'?'AD':'ME'):'AI')+'</div><div><div class="bubble '+(isUser?'user':'ai')+'">'+html+'</div>'+(src?'<div class="src-tag">📎 '+src+'</div>':'')+(link?'<a href="'+link+'" target="_blank" class="wiki-link">🔗 두레이 위키에서 자세히 보기</a>':'')+'</div>';
+  d.innerHTML='<div class="av '+(isUser?'user':'ai')+'">'+(isUser?(curRole==='admin'?'AD':'ME'):'AI')+'</div><div><div class="bubble '+(isUser?'user':'ai')+'">'+html+'</div>'+(src?'<div class="src-tag">📎 '+src+'</div>':'')+(link?'<a href="'+link+'" target="_blank" class="wiki-link">🔗 두레이에서 자세히 보기</a>':'')+'</div>';
   c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
 function showTyping(){var c=document.getElementById('messages'),d=document.createElement('div');d.className='msg';d.id='typing';d.innerHTML='<div class="av ai">AI</div><div class="bubble ai"><div class="typing-indicator"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>';c.appendChild(d);c.scrollTop=c.scrollHeight;}
