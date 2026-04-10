@@ -502,6 +502,12 @@ async function saveToNotion(name,content,type,category,link,comments,hasAttachme
   var res=await fetch('/api/docs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,content:content,type:type,category:category,link:link,comments:comments,hasAttachment:hasAttachment})});
   var data=await res.json();if(data.error)throw new Error(data.error);return data;
 }
+function deleteDocByIndex(i){
+  var d=notionDocs[i];
+  if(!d)return;
+  deleteDoc(d.id, d.name);
+}
+
 async function deleteDoc(id,name){
   if(!confirm('"'+name+'" 자료를 삭제할까요?'))return;
   try{var res=await fetch('/api/docs/'+id,{method:'DELETE'});var data=await res.json();if(data.ok){showToast('삭제되었어요');await loadDocs();}else showToast('삭제 실패: '+data.error);}
