@@ -233,7 +233,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <div class="msg">
               <div class="av ai">AI</div>
               <div>
-                <div class="bubble ai">안녕하세요! HR 관련 궁금한 사항을 질문해 주세요.<br>왼쪽 카테고리를 클릭하면 등록된 자료를 볼 수 있어요.</div>
+                <div class="bubble ai">검색어를 입력하면 등록된 자료를 바로 찾아드려요!<br>왼쪽 카테고리를 클릭해도 자료를 볼 수 있어요.</div>
                 <div style="margin-top:8px">
                   <span class="fchip" onclick="askFaq('급여 관련해서 알려주세요')">💰 급여</span>
                   <span class="fchip" onclick="askFaq('사대보험 관련해서 알려주세요')">🏥 사대보험</span>
@@ -245,8 +245,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           </div>
           <div class="input-area">
             <div class="input-row">
-              <textarea id="userInput" placeholder="질문을 입력하세요..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-              <button class="send-btn" id="sendBtn" onclick="sendMessage()">전송 ↗</button>
+              <textarea id="userInput" placeholder="검색어를 입력하세요..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+              <button class="send-btn" id="sendBtn" onclick="sendMessage()">검색 🔍</button>
             </div>
           </div>
         </div>
@@ -683,27 +683,71 @@ function removeTyping(){var t=document.getElementById('typing');if(t)t.remove();
 async function sendMessage(){
   var inp=document.getElementById('userInput'),q=inp.value.trim();if(!q)return;
   inp.value='';inp.style.height='auto';
-  document.getElementById('sendBtn').disabled=true;
+
+  // 키워드 검색으로 노션 자료 바로 표시 (AI 없음)
+  var qLow=q.toLowerCase();
+  var qWords=qLow.split(/\s+/).filter(function(w){return w.length>1;});
+
+  // 사용자 메시지 표시
   appendMsg('user',q,null,null);
-  chatHistory.push({role:'user',content:q});
-  showTyping();
-  try{
-    var res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:chatHistory.slice(-4),docs:notionDocs,question:q})});
-    var data=await res.json();
-    if(data.error)throw new Error(data.error);
-    chatHistory.push({role:'assistant',content:data.reply});
-    removeTyping();
-    var wikiLink=null;
-    if(data.similarDoc && data.similarDoc.link) {
-      wikiLink=data.similarDoc.link;
-    } else {
-      var relatedDoc=notionDocs.find(function(d){return d.link&&data.reply.indexOf(d.name)!==-1;});
-      wikiLink=relatedDoc?relatedDoc.link:null;
-    }
-    appendMsg('ai',data.reply.replace(/\n/g,'<br>'),notionDocs.length>0?'내부 자료 기반 답변':null,wikiLink);
-    if(data.reply.indexOf('등록되지 않은')===-1)showSuggestedQuestions(q,data.reply);
-  }catch(e){removeTyping();appendMsg('ai','오류: '+e.message,null,null);}
-  document.getElementById('sendBtn').disabled=false;
+
+  // 키워드 매칭
+  var matched=notionDocs.filter(function(d){
+    var txt=((d.name||'')+' '+(d.content||'')+' '+(d.comments||'')+' '+(d.category||'')).toLowerCase();
+    return qWords.some(function(w){return txt.indexOf(w)!==-1;});
+  }).sort(function(a,b){
+    // 제목에 키워드 있으면 우선순위
+    var aName=(a.name||'').toLowerCase();
+    var bName=(b.name||'').toLowerCase();
+    var aScore=qWords.filter(function(w){return aName.indexOf(w)!==-1;}).length;
+    var bScore=qWords.filter(function(w){return bName.indexOf(w)!==-1;}).length;
+    return bScore-aScore;
+  }).slice(0,5);
+
+  if(!matched.length){
+    // 결과 없을 때
+    appendSearchEmpty(q);
+    showSuggestedQuestions(q,'');
+    return;
+  }
+
+  // 결과 카드 표시
+  appendSearchResults(q, matched);
+}
+
+function appendSearchEmpty(q){
+  var c=document.getElementById('messages');
+  var d=document.createElement('div');d.className='msg';
+  d.innerHTML='<div class="av ai">📋</div><div><div class="bubble ai" style="color:#aaa">'+
+    '"'+escHtml(q)+'" 관련 등록된 자료가 없어요.<br><small>추가가 필요한 경우 클라우드관리팀에 문의하세요.</small></div></div>';
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+
+function appendSearchResults(q, docs){
+  var c=document.getElementById('messages');
+  var d=document.createElement('div');d.className='msg';
+  var cards=docs.map(function(doc){
+    var body=doc.content?doc.content.slice(0,200)+(doc.content.length>200?'...':''):'내용 없음';
+    var link=doc.link?'<a href="'+escHtml(doc.link)+'" target="_blank" class="board-item-link" style="margin-top:8px;display:inline-flex">🔗 두레이에서 자세히 보기</a>':'';
+    var attach=doc.hasAttachment?'<span style="font-size:11px;color:#856404;background:#FFF3CD;padding:2px 8px;border-radius:10px;margin-left:6px">📎 첨부파일 있음</span>':'';
+    return '<div style="background:#fff;border:1px solid #e5e5e3;border-radius:10px;padding:14px 16px;margin-bottom:8px;">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+        '<span style="font-size:13px;font-weight:600;flex:1">'+hl(doc.name,q)+'</span>'+
+        '<span style="font-size:10px;background:#EEF4FB;color:#185FA5;padding:2px 8px;border-radius:10px;">'+escHtml(doc.category)+'</span>'+
+      '</div>'+
+      '<div style="font-size:13px;color:#555;line-height:1.6;">'+hl(body,q)+'</div>'+
+      (doc.comments?'<div style="font-size:12px;color:#888;margin-top:6px;padding:6px 10px;background:#f7f7f5;border-radius:6px;border-left:2px solid #ddd">💬 '+hl(doc.comments.slice(0,100),q)+'</div>':'')+
+      '<div style="margin-top:8px">'+link+attach+'</div>'+
+    '</div>';
+  }).join('');
+
+  d.innerHTML='<div class="av ai">📋</div><div style="max-width:85%;width:100%">'+
+    '<div style="font-size:12px;color:#aaa;margin-bottom:8px">📌 "'+escHtml(q)+'" 관련 자료 '+docs.length+'개</div>'+
+    cards+'</div>';
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+
+  // 관련 자료 추천
+  showSuggestedQuestions(q, docs.map(function(d){return d.name;}).join(' '));
 }
 
 var dz=document.getElementById('dropZone');
